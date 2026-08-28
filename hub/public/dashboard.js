@@ -832,7 +832,13 @@
       var runEl = document.getElementById('detectRunState');
       if (runEl) { runEl.textContent = label; runEl.style.color = busy ? 'var(--warning)' : 'var(--muted)'; }
       var countEl = document.getElementById('detectLogCount');
-      if (countEl) countEl.textContent = logs.length + ' 行';
+      if (countEl) {
+        var st = d.stats || {};
+        // 长跑时日志窗口会截断，这里显示累计计数，避免进度看起来"卡住"
+        countEl.textContent = (st.started || st.success)
+          ? ('已开 ' + (st.started || 0) + ' · 成功 ' + (st.success || 0) + ' · 入池 ' + (st.ingested || 0))
+          : (logs.length + ' 行');
+      }
       var startBtn = document.getElementById('detectStartBtn');
       var stopBtn = document.getElementById('detectStopBtn');
       if (startBtn) { startBtn.disabled = busy; startBtn.style.opacity = busy ? '0.5' : '1'; }

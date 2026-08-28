@@ -10,7 +10,7 @@ import * as compat from "./compat.mjs";
 
 const REGISTER_DIR = process.env.GROK_REGISTER_DIR || "/run/csi/mount-root/nas/4079184d856ecc166ed19d4887083405/workspaces/default/deploy/grok-register-main";
 const PY = join(REGISTER_DIR, ".venv/bin/python");
-const RING_MAX = 800;
+const RING_MAX = 4000;   // 不限量模式下一个号刷 8-10 行，环要够大才不丢历史
 
 let child = null;
 let exited = true; // 信号杀掉的子进程 exitCode 恒为 null，不能拿它判断存活
@@ -36,6 +36,8 @@ function mail(e) {
 let prep = { turnstile: 0, mailbox: 0, code: 0, dirty: false };
 let prepShown = false;   // 只在首次开单前汇总一次；之后的预取是后台补货，不再打扰
 let appliedEnv = "";     // 本轮生效的完整环境覆盖（供 status 排障，不刷日志）
+let startedCount = 0;    // 本轮开单数 / 成功数：累计计数，不受日志窗口截断影响
+let successCount = 0;
 
 function resetTidy() {
   prep = { turnstile: 0, mailbox: 0, code: 0, dirty: false };
@@ -77,11 +79,11 @@ function tidy(l) {
 
   // 单个账号的进展
   let m = s.match(/^\[→\] 开始注册 #(\d+)/);
-  if (m) return [...flushPrep(), "", `#${m[1]} 开始注册`];
+  if (m) { startedCount += 1; return [...flushPrep(), "", `#${m[1]} 开始注册`]; }
   m = s.match(/└ #(\d+) (.+?)\.{0,3}$/);
   if (m) return [`   · ${m[2]}`];
   m = s.match(/^\[✓\] 注册成功 #(\d+) \| 用时 (\S+)/);
-  if (m) return [`#${m[1]} ✓ 注册成功（${m[2]}）`];
+  if (m) { successCount += 1; return [`#${m[1]} ✓ 注册成功（${m[2]}）`]; }
   if (/^\[✗\]|注册失败/.test(s)) return [`  ✗ ${s.replace(/^\[[^\]]*\]\s*/, "")}`];
 
   // 冗余的"完成"宣告与进度心跳（收尾会给最终结论）
@@ -175,23 +177,49 @@ async function ingestOne(a, label) {
   for (const w of warn) pushRaw(`    ⚠ ${w}`);
 }
 
-/** 扫一遍 accounts.txt，把没处理过的新号立刻接入。注册仍在跑时并行进行。 */
+/** 从 keys/accounts.txt 删掉已成功接入的行——不等收尾，避免长跑时明文 SSO 堆积。
+    并发上传时多个 worker 会同时改这个文件，用队列串行化，否则会互相覆盖丢行。 */
+let removeChain = Promise.resolve();
+function removeIngestedLine(line) {
+  removeChain = removeChain.then(() => {
+    const f = join(REGISTER_DIR, "keys", "accounts.txt");
+    try {
+      if (!existsSync(f)) return;
+      const kept = readFileSync(f, "utf8").split(/\r?\n/).filter((l) => l.trim() && l.trim() !== line.trim());
+      if (kept.length) writeFileSync(f, kept.join("\n") + "\n", { mode: 0o600 });
+      else rmSync(f, { force: true });
+    } catch { /* 下一轮或收尾会再处理 */ }
+  });
+  return removeChain;
+}
+
+/** 扫一遍 accounts.txt，把没处理过的新号立刻接入。注册仍在跑时并行进行。
+    并发处理：单个号要 4 次 grok2api 调用（约 3-5 秒），串行会追不上注册速度，
+    长跑时明文 SSO 会在磁盘堆积（曾观测注册 155 个只入池 50 个）。 */
+const INGEST_CONCURRENCY = 4;
+
 async function drainNewAccounts() {
   if (liveBusy) return;
   liveBusy = true;
   try {
-    for (const a of parseKeysFile("accounts.txt")) {
-      if (uploadedEmails.has(a.email)) continue;
-      uploadedEmails.add(a.email);
-      try {
-        await ingestOne(a, "[即时]");
-        liveUploaded += 1;
-      } catch (e) {
-        pushRaw(`  [即时] ${mail(a.email)} ✗ 上传失败：${e.message}（留到收尾重试）`);
-        liveFailures.push(a.email);
-        uploadedEmails.delete(a.email); // 允许收尾阶段重试
+    const queue = parseKeysFile("accounts.txt").filter((a) => !uploadedEmails.has(a.email));
+    for (const a of queue) uploadedEmails.add(a.email);   // 先占位，避免下轮重复
+    let cursor = 0;
+    const worker = async () => {
+      while (cursor < queue.length) {
+        const a = queue[cursor++];
+        try {
+          await ingestOne(a, "[即时]");
+          liveUploaded += 1;
+          await removeIngestedLine(a.line);   // 已入池，本地不再保留明文 SSO
+        } catch (e) {
+          pushRaw(`  [即时] ${mail(a.email)} ✗ 上传失败：${e.message}（留到收尾重试）`);
+          liveFailures.push(a.email);
+          uploadedEmails.delete(a.email); // 允许收尾阶段重试
+        }
       }
-    }
+    };
+    await Promise.all(Array.from({ length: Math.min(INGEST_CONCURRENCY, queue.length) }, worker));
   } finally {
     liveBusy = false;
   }
@@ -219,7 +247,8 @@ async function finalizeRun() {
   await drainNewAccounts();          // 最后再兜一次，捞走末班车的号
   const fresh = parseKeysFile("accounts.txt");
   const retry = parseKeysFile("accounts.retry.txt");
-  const success = fresh.length;      // 计数口径：只算本轮新注册（含已即时上传的）
+  // 即时接入成功的行已从 accounts.txt 删除，所以本轮总数 = 已即时接入 + 文件残留
+  const success = liveUploaded + fresh.length;
   let uploaded = liveUploaded;       // 即时上传的算数
   const failures = [];
   const retryFailedLines = [];
@@ -231,9 +260,9 @@ async function finalizeRun() {
   phase = "finalize";
   pushRaw("")
   pushRaw("──── 收尾 ────");
-  pushRaw(`  产物：本轮新号 ${fresh.length} 个${liveUploaded ? `（${liveUploaded} 个已在注册中即时接入）` : ""}${retry.length ? `，上轮待补传 ${retry.length} 个` : ""}`);
+  pushRaw(`  产物：本轮新号 ${success} 个${liveUploaded ? `（${liveUploaded} 个已在注册中即时接入）` : ""}${retry.length ? `，上轮待补传 ${retry.length} 个` : ""}`);
   if (total === 0) {
-    pushRaw(fresh.length > 0
+    pushRaw(success > 0
       ? "  全部已在注册过程中即时接入，无需补传"
       : "  ⚠ 没有可上传的账号（可能全部被风控拒绝）");
   } else {
@@ -254,7 +283,7 @@ async function finalizeRun() {
         else retryFailedLines.push(a.line);
       }
     }
-    pushRaw(`  补传完成：成功 ${uploaded}/${fresh.length + retry.length}${failures.length ? `，失败 ${failures.length}` : ""}`);
+    pushRaw(`  补传完成：成功 ${uploaded}/${success + retry.length}${failures.length ? `，失败 ${failures.length}` : ""}`);
   }
   const kdir = join(REGISTER_DIR, "keys");
   const keep = [...retryFailedLines, ...freshFailedLines];
@@ -370,7 +399,13 @@ export function status() {
     target,
     strict,
     lastResult,
-    lines: ring.slice(-120),
+    lines: ring.slice(-1200),   // 前端展示窗口；原为 120，不限量模式下只够十几个号，进度看起来会"卡住"
+    stats: {
+      // 累计计数不受日志窗口影响，长跑时看这里
+      started: startedCount,
+      success: successCount,
+      ingested: liveUploaded,
+    },
     registerDir: REGISTER_DIR,
   };
 }

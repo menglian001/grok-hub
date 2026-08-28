@@ -151,7 +151,7 @@ const server = createServer(async (req, res) => {
       const s = reg.status();
       const r = s.lastResult;
       return json(res, 200, { logs: s.lines, running: s.running,
-        phase: s.phase, phaseText: s.phaseText,
+        phase: s.phase, phaseText: s.phaseText, stats: s.stats,
         result: r ? { success: r.code === 0 || (r.uploaded !== undefined && r.failures && r.failures.length === 0),
           message: r.uploading ? "注册结束，正在上传 grok2api…"
             : r.uploaded !== undefined ? `注册 ${r.success} 个，上传 ${r.uploaded} 个${r.failures && r.failures.length ? `，失败 ${r.failures.length}` : ""}`
