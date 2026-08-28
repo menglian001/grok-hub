@@ -61,5 +61,5 @@ GROK_HUB_PASSWORD=你的面板密码 node server.mjs 8790
 | `hub/compat.mjs` | 前端数据契约（数字 id 桥、stats、设置定义） |
 | `hub/public/` | 仪表盘前端（fragment 组装，同源 cookie 鉴权） |
 
-注册机本体在 `deploy/grok-register-main`（不在本仓库内），`STRICT_TARGET=1`
+注册机本体见 [hechuyi/grok-free-register](https://github.com/hechuyi/grok-free-register)（不在本仓库内），`STRICT_TARGET=1`
 时 `--target N` 恰好注册 N 个。

@@ -41,7 +41,7 @@ hub 逐个上传 grok2api            → grok_web 账号
 |---|---|
 | Node ≥ 22 | 用了内置 `node:sqlite`，**零 npm 依赖**，不用 `npm install` |
 | [grok2api](https://github.com/chenyme/grok2api) | 已部署并能访问管理面（本项目只调它的 API） |
-| [grok-register](https://github.com/menglian001/grok-register) | Grok 注册机，需能独立跑通（Python + Playwright） |
+| [grok-free-register](https://github.com/hechuyi/grok-free-register) | Grok 注册机，需能独立跑通（Python + Playwright） |
 | 代理 | 注册机要能访问 x.ai / grok.com |
 
 ## 快速开始
@@ -196,8 +196,7 @@ hub/
 | 项目 | 作者 | 在本项目中的角色 |
 |---|---|---|
 | [grok2api](https://github.com/chenyme/grok2api) | [@chenyme](https://github.com/chenyme) | **核心依赖**。Grok Build/Web/Console 多账号 API 网关。三格式派生（`sync-to-console` / `convert-to-build`）与 NSFW 开启（`accept-terms` / `birth-date` / `nsfw`）全部是它提供的管理 API，本项目只是按顺序调用，**未修改其任何代码** |
-| [grok-register](https://github.com/menglian001/grok-register) | grok-free-register contributors | **注册引擎**。批量注册 Grok 账号、风控检测、SSO→Device Flow 转换。本项目通过子进程驱动它，不含其代码 |
-| [grok-register](https://github.com/AaronL725/grok-register) | [@AaronL725](https://github.com/AaronL725) | 注册机上游，多邮箱服务与代理池思路来源 |
+| [grok-free-register](https://github.com/hechuyi/grok-free-register) | [@hechuyi](https://github.com/hechuyi) | **注册引擎原作者**（MIT）。批量注册 Grok 账号、风控检测、SSO→Device Flow 转换。本项目通过子进程驱动它，不含其代码 |
 
 前端布局脱胎于 u1s12api 的 dashboard（其视觉结构又源自 postman2api dashboard），
 数据层为本项目重写。
