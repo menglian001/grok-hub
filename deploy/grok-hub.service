@@ -1,0 +1,24 @@
+[Unit]
+Description=Grok Hub — Grok 注册控制台
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/grok-hub
+ExecStart=/usr/bin/node hub/server.mjs
+Restart=on-failure
+RestartSec=5
+
+# 必填：注册机项目目录（hub 会调用其 .venv/bin/python -m grok_register.register）
+Environment=GROK_REGISTER_DIR=/opt/grok-register
+# 监听地址。绑非 127.0.0.1 时必须已设置面板密码，否则 hub 拒绝启动
+Environment=GROK_HUB_HOST=127.0.0.1
+Environment=GROK_HUB_PORT=8790
+# 前面有 HTTPS 反代时设为 1（cookie 加 Secure）
+# Environment=GROK_HUB_TLS=1
+# 面板密码只在首次或改密码时需要，写入哈希后建议注释掉
+# Environment=GROK_HUB_PASSWORD=换成你的密码
+
+[Install]
+WantedBy=multi-user.target

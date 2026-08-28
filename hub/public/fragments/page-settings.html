@@ -1,0 +1,62 @@
+<section class="page" id="page-settings">
+    <div class="p-8">
+      <div class="flex items-end justify-between mb-8 gap-6 flex-wrap">
+        <div>
+          <div class="text-[11px] font-semibold tracking-wider uppercase mb-2" style="color: var(--muted);">Settings</div>
+          <h1 class="hero-title">系统 <em>设置</em></h1>
+          <p class="mt-2 text-[14px]" style="color: var(--fg-2);">grok2api 连接、注册代理 / 邮箱令牌 / 并发与注册机默认值。</p>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card p-4 h-fit lg:sticky lg:top-20">
+          <div class="space-y-1">
+            <a href="#set-general" class="sidebar-item active">服务状态</a>
+            <a href="#set-grok2api" class="sidebar-item">grok2api 连接</a>
+            <a href="#set-runtime" class="sidebar-item">运行配置</a>
+            <a href="#set-about" class="sidebar-item">关于</a>
+          </div>
+        </div>
+
+        <div class="lg:col-span-2 space-y-4">
+          <div class="card p-6" id="set-general">
+            <h3 class="font-display text-[20px] font-medium mb-1">服务状态</h3>
+            <p class="text-[12px] mb-5" style="color: var(--muted);">本机控制台信息</p>
+            <div class="space-y-4">
+              <div class="flex items-center justify-between p-3 rounded-lg" style="background: var(--bg);">
+                <div>
+                  <div class="text-[13px] font-semibold">运行状态</div>
+                  <div class="text-[12px] mt-0.5" style="color: var(--fg-2);">Dashboard 可访问即表示服务在线</div>
+                </div>
+                <span class="tag tag-green">运行中</span>
+              </div>
+              <div>
+                <label class="text-[12.5px] font-semibold block mb-1.5">控制台地址</label>
+                <input class="input font-mono" id="settingsHost" readonly>
+              </div>
+            </div>
+          </div><div class="card p-6" id="set-grok2api">
+            <h3 class="font-display text-[20px] font-medium mb-1">grok2api 连接</h3>
+            <p class="text-[12px] mb-5" style="color: var(--muted);">
+              上传账号用的管理面凭据，保存进本机 SQLite（0700 目录）。只调用 grok2api 的现成 API，不改它的任何代码。
+            </p>
+            <div class="flex items-center gap-2 mb-4">
+              <button class="btn btn-ghost" id="grok2apiTestBtn" onclick="testGrok2api()">测试连接（登录一次）</button>
+              <span class="text-[11px] font-mono" style="color: var(--muted);">填好左侧地址/账密并保存后再测</span>
+            </div>
+            <pre id="grok2apiTestResult" class="p-3 font-mono text-[12px] leading-relaxed rounded-lg" style="background: var(--bg); color: var(--fg-2); white-space: pre-wrap; word-break: break-all; display:none;"></pre>
+          </div><div class="card p-6" id="set-runtime">
+            <h3 class="font-display text-[20px] font-medium mb-1">运行配置</h3>
+            <p class="text-[12px] mb-5" style="color: var(--muted);">以下配置项真实读写后端 SQLite settings 表，保存后立即生效</p>
+            <div class="space-y-3" id="settingsForm"></div>
+          </div><div class="card p-6" id="set-about">
+            <h3 class="font-display text-[20px] font-medium mb-1">关于</h3>
+            <p class="text-[12px] leading-relaxed" style="color: var(--muted);">
+              Grok Hub · 批量注册 Grok 账号，自动上传 grok2api 并派生三格式、开启 NSFW，本地不留存账号。
+              注册机本体在 <span class="font-mono">GROK_REGISTER_DIR</span>，grok2api 在远端原样运行。
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+</section>

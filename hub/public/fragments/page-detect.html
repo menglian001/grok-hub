@@ -1,0 +1,69 @@
+<section class="page" id="page-detect">
+  <div class="p-8 max-w-[1400px]">
+    <div class="mb-8">
+      <div class="text-[11px] font-semibold tracking-[0.15em] uppercase mb-2" style="color: var(--muted);">Register</div>
+      <h1 class="hero-title">注册<em>机</em></h1>
+      <p class="text-[14px] mt-3 max-w-[640px]" style="color: var(--fg-2);">
+        驱动本机 grok-register-main 批量注册 Grok 账号。跑完自动上传 grok2api
+        （含三格式派生）并清除本地留存，这里只留计数。
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="card p-6 lg:col-span-1">
+        <div class="text-[13px] font-semibold mb-4">启动参数</div>
+        <div class="space-y-4">
+          <div>
+            <label class="text-[12px] font-semibold" style="color: var(--fg-2);">注册数量 target</label>
+            <input class="input font-mono w-full mt-1.5" id="detectCount" type="number" min="0" value="1">
+            <div class="text-[11px] mt-1" style="color: var(--muted);">0 = 不限量，Ctrl-C 前一直注册</div>
+          </div>
+          <div class="flex items-center justify-between p-3 rounded-lg" style="background: var(--bg);">
+            <div>
+              <div class="text-[13px] font-semibold">严格精确模式</div>
+              <div class="text-[11px] mt-0.5" style="color: var(--fg-2);">恰好注册 N 个（STRICT_TARGET）；关闭则允许为吸收失败率超发</div>
+            </div>
+            <label class="switch"><input type="checkbox" id="detectStrict" checked><div class="slider"></div></label>
+          </div>
+          <div class="rounded-lg p-3 text-[11px] leading-relaxed" style="background: var(--bg-2); color: var(--muted);">
+            代理 / 邮箱令牌 / 并发在「系统设置」里改，启动时注入注册机（覆盖 .env）。
+            风控被拒的账号不算成功数，严格模式会自动补注册。
+          </div>
+          <div class="flex items-center gap-2">
+            <button class="btn btn-primary" id="detectStartBtn" onclick="startDetect()">开始注册</button>
+            <button class="btn btn-ghost" id="detectStopBtn" onclick="forceStopDetect()" style="color: var(--danger);">停止</button>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-[11px]" style="color: var(--muted);">状态</span>
+            <span id="detectRunState" style="color: var(--muted);">空闲</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6 lg:col-span-2">
+        <div class="flex items-center justify-between mb-4">
+          <div class="text-[13px] font-semibold">运行日志</div>
+          <div class="flex items-center gap-2">
+            <span class="tag tag-gray" id="detectLogState">空闲</span>
+            <span class="text-[11px] font-mono" style="color: var(--muted);" id="detectLogCount">0 行</span>
+          </div>
+        </div>
+        <div class="flex items-center justify-between mb-3 text-[12px]">
+          <div class="flex items-center gap-2">
+            <span>最近结果</span>
+            <span class="tag tag-green" id="detectResultTag" style="display:none;">已完成</span>
+            <span id="detectResultText" style="color: var(--muted);">—</span>
+          </div>
+          <label class="flex items-center gap-1.5 text-[11px]" style="color: var(--muted);">
+            <input type="checkbox" id="autoScroll" checked> 自动滚动
+          </label>
+        </div>
+        <pre id="detectLogs" class="p-4 font-mono text-[11px] leading-relaxed rounded-lg overflow-y-auto"
+          style="background: var(--bg); color: var(--fg-2); height: 420px; white-space: pre-wrap; word-break: break-all;">暂无日志。设置参数后点「开始注册」。</pre>
+        <div class="text-[11px] mt-3" style="color: var(--muted);">
+          跑完自动把新号上传 grok2api（含 Console/Build 派生），成功后清除本地 keys/ 留存；上传失败的号会保留并告警。风控拒绝的不算成功。
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
