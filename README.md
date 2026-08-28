@@ -19,7 +19,7 @@ Grok 账号注册控制台。按一次「开始注册」，剩下全自动：批
 你点「开始注册」
    ↓
 注册机批量注册 Grok 账号 ──────────────→ 产出 Web SSO
-   ↓
+   ↓ 每成功一个立刻接入（不等整批结束）
 上传 grok2api                          → grok_web 账号
    ↓ sync-to-console                   → grok_console 账号
    ↓ convert-to-build                   → grok_build 账号
@@ -80,6 +80,33 @@ GROK_REGISTER_DIR=/opt/grok-free-register node hub/server.mjs 8790
 | `GROK_HUB_DIR` | `~/.grok-hub/hub` | SQLite 存放目录（0700 权限） |
 | `GROK_HUB_TLS` | `0` | 设 `1` 表示前面有 HTTPS 反代，cookie 加 `Secure` |
 
+### Docker 部署（宿主装不了 Node 22 时用）
+
+Ubuntu 18.04 这类旧系统 glibc 太老（2.27），装不了 Node 22 与现代 Python wheel。
+用 Docker 绕开——镜像自带 Python 3.11 + stealth chromium，约 1.4GB：
+
+```bash
+# 目录结构：deploy/Dockerfile、deploy/hub/（本项目 hub/）、deploy/register/（注册机源码）
+cd deploy
+cat > .env <<'EOF'
+GROK_HUB_PASSWORD=你的面板密码
+REGISTER_PROXY=http://172.17.0.1:7890
+EOF
+docker compose build && docker compose up -d
+```
+
+**代理必须用 docker 网桥地址**：容器里的 `127.0.0.1` 指容器自己，填宿主代理要写
+`172.17.0.1`。如果代理只监听 `127.0.0.1`，需让它同时监听 `172.17.0.1`。
+
+拉镜像走不通时给 dockerd 也配代理：
+
+```bash
+mkdir -p /etc/systemd/system/docker.service.d
+printf '[Service]\nEnvironment="HTTPS_PROXY=http://127.0.0.1:7890"\n' \
+  > /etc/systemd/system/docker.service.d/http-proxy.conf
+systemctl daemon-reload && systemctl restart docker
+```
+
 ### systemd
 
 `deploy/grok-hub.service` 可直接用：
@@ -103,7 +130,34 @@ journalctl -u grok-hub -f
 
 注册机页的「严格精确模式」（`STRICT_TARGET=1`）表示恰好注册 N 个；关掉则允许为吸收失败率而超发。
 代理、邮箱令牌、并发都在设置页改，启动时注入注册机进程，**覆盖它的 `.env`，留空则沿用**。
-每次启动日志会回显生效的覆盖项（令牌自动脱敏），方便核对。
+
+日志经过整理，只留动作与失败，不刷流水线内部噪音：
+
+```
+▶ 开始注册 1 个账号（严格精确模式）
+  代理 http://172.17.0.1:7890 · 并发 2 · 邮箱 tempmail
+  读取 x.ai 站点配置
+  启动隐身浏览器
+  资源准备完成 · Turnstile 1 · 邮箱 1 · 验证码 1
+
+#1 开始注册
+   · 浏览器页面就绪
+   · 校验邮箱验证码 oc7a***@cmuk.edu.kg
+   · 验证码通过
+   · 提交注册表单（邮箱+密码+姓名+Turnstile）
+   · 已获取 SSO 凭证
+#1 ✓ 注册成功（8s）
+  [即时] oc7a***@cmuk.edu.kg → 已接入（web + console + build + NSFW）
+
+──── 收尾 ────
+  产物：本轮新号 1 个（1 个已在注册中即时接入）
+  全部已在注册过程中即时接入，无需补传
+  本地留存已清除
+──────── 全部结束：注册 1 个，已全部接入 grok2api ────────
+```
+
+所有失败（Turnstile 超时、验证码超时、派生失败、上传失败）都不折叠。
+完整的生效环境变量在 `/api/register/status` 的 `envApplied` 字段，排障可查但不刷屏。
 
 ## 自动化怎么实现的
 
@@ -139,6 +193,31 @@ POST /api/admin/v1/accounts/web/{id}/nsfw           开成人偏好
 
 不接受条款、没成年生日，grok.com 不会让你开 NSFW。成功后账号带 `nsfwEnabledAt` 时间戳，
 grok2api 账号列表里会显示一个黄色标记。两层都开才真正生效，账号层可在设置里关掉。
+
+### 注册即上传，不等整批结束
+
+注册过程中每 5 秒扫一次产物，成功一个就立刻走完整链路（上传 → 派生 → NSFW），与注册并行。
+日志里带 `[即时]` 前缀。除了实时性，还能抗中断：跑到一半崩了，已注册的号也已经落库。
+
+### 并发与资源控制
+
+严格精确模式（`STRICT_TARGET=1`）下 **成功数精确等于目标数**。注意「开始注册 #N」的条数
+可能多于目标——失败的单会归还配额去补位重试，这是正常的，判断是否超发要看成功数。
+
+注册机的并发受多个旋钮共同影响，都在设置页：
+
+| 设置 | 原环境变量 | 说明 |
+|---|---|---|
+| 注册并发上限 | `PHYSICAL_CAP` | 浏览器物理并发 |
+| token 池缓冲目标 | `T_TARGET` | 在飞单水位，**默认 4 会把并发顶到 4** |
+| 注册 worker 数 | `C_WORKERS` | 留空自动 = 并发上限 + 2 |
+| 邮箱预取上限 | `Q_PENDING_CAP` | 默认 12，会预申请远多于所需的邮箱 |
+| 验证码缓冲目标 | `Q_TARGET` | 就绪验证码水位 |
+| 严格模式预取余量 | `STRICT_OVERHEAD` | `1`=留一个备用（失败立即补位）；`0`=零浪费但失败要从头重试 |
+
+严格模式下这些水位会按 `目标数 + 预取余量` 自动收敛，避免小目标时白申请邮箱、
+白破解 Turnstile（原始默认下 target=1 会申请 12 个邮箱，收敛后 2 个）。
+**用付费邮箱令牌时尤其要注意这一项。**
 
 ### 注册机会卡住，hub 会替它收尾
 

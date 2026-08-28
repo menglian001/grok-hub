@@ -1,0 +1,39 @@
+services:
+  grok-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: grok-hub:local
+    container_name: grok-hub
+    restart: unless-stopped
+    # 面板端口。仅本机监听则改为 "127.0.0.1:8790:8790"
+    ports:
+      - "8790:8790"
+    environment:
+      TZ: Asia/Shanghai
+      # 面板密码：首次启动写入哈希后可注释掉
+      GROK_HUB_PASSWORD: "${GROK_HUB_PASSWORD:?需在 .env 里设置面板密码}"
+      GROK_HUB_HOST: "0.0.0.0"
+      GROK_HUB_PORT: "8790"
+      GROK_REGISTER_DIR: /app/register
+      GROK_HUB_DIR: /data/hub
+      # 注册机出网代理。宿主机上的代理请用 docker 网桥地址（默认 172.17.0.1），
+      # 不能用 127.0.0.1——那是容器自己的回环。可在 .env 里覆盖 REGISTER_PROXY。
+      HTTP_PROXY: "${REGISTER_PROXY:-http://172.17.0.1:17891}"
+      HTTPS_PROXY: "${REGISTER_PROXY:-http://172.17.0.1:17891}"
+      NO_PROXY: "127.0.0.1,localhost,172.17.0.1,grok2api"
+      # grok2api 走宿主机映射端口
+      PHYSICAL_CAP: "2"
+    volumes:
+      - ./data:/data
+      # 注册产物目录：便于宿主机排查；正常情况下 hub 会自动清空
+      - ./keys:/app/register/keys
+    extra_hosts:
+      - "host.docker.internal:172.17.0.1"
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    mem_limit: 2g
+    shm_size: 1g

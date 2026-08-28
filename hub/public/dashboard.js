@@ -821,31 +821,38 @@
       var logs = d.logs || [];
       var running = !!d.running;
       var result = d.result || null;
+      // 收尾阶段（上传 grok2api）也算"忙"，此时进程已退出但活还没干完
+      var busy = running || d.phase === 'finalize';
+      var label = d.phaseText || (running ? '运行中' : '空闲');
+      var shortLabel = d.phase === 'registering' ? '注册中'
+        : d.phase === 'finalize' ? '上传中'
+        : d.phase === 'done' ? '已完成' : '空闲';
       var stateEl = document.getElementById('detectLogState');
-      if (stateEl) { stateEl.textContent = running ? '运行中' : '空闲'; stateEl.className = 'tag ' + (running ? 'tag-amber' : 'tag-gray'); }
+      if (stateEl) { stateEl.textContent = shortLabel; stateEl.className = 'tag ' + (busy ? 'tag-amber' : (d.phase === 'done' ? 'tag-green' : 'tag-gray')); }
       var runEl = document.getElementById('detectRunState');
-      if (runEl) { runEl.textContent = running ? '运行中' : '空闲'; runEl.style.color = running ? 'var(--warning)' : 'var(--muted)'; }
+      if (runEl) { runEl.textContent = label; runEl.style.color = busy ? 'var(--warning)' : 'var(--muted)'; }
       var countEl = document.getElementById('detectLogCount');
       if (countEl) countEl.textContent = logs.length + ' 行';
       var startBtn = document.getElementById('detectStartBtn');
       var stopBtn = document.getElementById('detectStopBtn');
-      if (startBtn) { startBtn.disabled = running; startBtn.style.opacity = running ? '0.5' : '1'; }
+      if (startBtn) { startBtn.disabled = busy; startBtn.style.opacity = busy ? '0.5' : '1'; }
       if (stopBtn) { stopBtn.disabled = !running; stopBtn.style.opacity = running ? '1' : '0.5'; }
       var resultTag = document.getElementById('detectResultTag');
       var resultText = document.getElementById('detectResultText');
       if (result) {
-        if (resultTag) { resultTag.style.display = ''; resultTag.textContent = result.success ? '已完成' : '已结束'; resultTag.className = 'tag ' + (result.success ? 'tag-green' : 'tag-red'); }
-        if (resultText) resultText.textContent = result.success ? ('成功 · ' + (result.email || '账号已入库')) : (result.message || '失败');
+        if (resultTag) { resultTag.style.display = ''; resultTag.textContent = d.phase === 'finalize' ? '上传中' : (result.success ? '已完成' : '已结束'); resultTag.className = 'tag ' + (d.phase === 'finalize' ? 'tag-amber' : (result.success ? 'tag-green' : 'tag-red')); }
+        if (resultText) resultText.textContent = result.message || '—';
       } else {
         if (resultTag) resultTag.style.display = 'none';
-        if (resultText) resultText.textContent = '—';
+        if (resultText) resultText.textContent = busy ? label : '—';
       }
-      if (detectWasRunning && !running && result && result.finished_at !== detectResultShown) {
+      // 只在收尾也结束后才提示，避免"注册完成"提前弹出
+      if (detectWasRunning && !busy && result && result.finished_at !== detectResultShown) {
         detectResultShown = result.finished_at;
-        toast(result.success ? ('注册成功：' + (result.email || '账号已入库')) : ('注册结束：' + (result.message || '失败')));
+        toast(result.success ? ('本批完成：' + (result.message || '已接入 grok2api')) : ('本批结束：' + (result.message || '失败')));
         loadAll();
       }
-      detectWasRunning = running;
+      detectWasRunning = busy;
       if (logs.length > 0 && (detectLastLen < 0 || logs.length !== detectLastLen)) {
         pre.textContent = logs.join('\n');
         var auto = document.getElementById('autoScroll');

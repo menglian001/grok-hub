@@ -43,7 +43,12 @@ export const settingDefs = [
   { key: "register_yyds_domain", label: "YYDS 指定域名", description: "留空自动分配", type: "text", default: "" },
   { key: "register_email_domain", label: "自建邮箱域名", description: "custom 模式专用", type: "text", default: "" },
   { key: "register_email_api", label: "自建邮箱 API", description: "custom 模式专用，收信服务地址", type: "text", default: "" },
-  { key: "register_physical_cap", label: "注册并发上限", description: "2核4G 建议 3-5", type: "int", default: "3" },
+  { key: "register_physical_cap", label: "注册并发上限", description: "同时进行的注册单数（浏览器物理并发）。2核4G 建议 2-3。注意：实际并发 = max(本项, 下面的 token 池目标)", type: "int", default: "2" },
+  { key: "register_t_target", label: "token 池缓冲目标", description: "注册机为吸收失败率预留的在飞单数（原 T_TARGET，默认 4）。想严格按上面的并发上限跑，把它设成与并发上限相同", type: "int", default: "2" },
+  { key: "register_c_workers", label: "注册 worker 数", description: "C 阶段并发 worker 数（原 C_WORKERS）。留空自动 = 并发上限+2；想硬压并发就设成与并发上限相同", type: "int", default: "" },
+  { key: "register_q_pending_cap", label: "邮箱预取上限", description: "同时在途的临时邮箱/验证码请求数（原 Q_PENDING_CAP，默认 12）。默认会预申请远多于所需的邮箱，用付费邮箱令牌时建议压到 3-4 省额度", type: "int", default: "4" },
+  { key: "register_q_target", label: "验证码缓冲目标", description: "就绪验证码的缓冲水位（原 Q_TARGET，默认 4）。与上面配合控制邮箱申请量", type: "int", default: "2" },
+  { key: "register_strict_overhead", label: "严格模式预取余量", description: "严格模式下额外预备的邮箱/Turnstile 数量。1=留一个备用（默认，失败可立即补位）；0=零浪费但失败要从头重试，耗时翻倍", type: "int", default: "1" },
 ];
 
 /** 注册机 spawn 时的环境变量覆盖（空值跳过=回退 .env）。 */
@@ -60,6 +65,11 @@ export function registerEnvOverrides(values) {
   put("EMAIL_DOMAIN", v.register_email_domain);
   put("EMAIL_API", v.register_email_api);
   put("PHYSICAL_CAP", v.register_physical_cap);
+  put("T_TARGET", v.register_t_target);
+  put("C_WORKERS", v.register_c_workers);
+  put("Q_PENDING_CAP", v.register_q_pending_cap);
+  put("Q_TARGET", v.register_q_target);
+  put("STRICT_OVERHEAD", v.register_strict_overhead);
   o.GROK2API_AUTO_IMPORT = "0"; // 上传由 hub 统一做，注册机自带导入必须关
   return o;
 }
