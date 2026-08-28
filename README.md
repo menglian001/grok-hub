@@ -2,7 +2,7 @@
 
 Grok 账号注册控制台。按一次「开始注册」，剩下全自动：批量注册 → 上传 [grok2api](https://github.com/chenyme/grok2api) → 派生 Web / Console / Build 三种格式 → 开启 NSFW → 清空本地留存。
 
-基于 [hechuyi/grok-free-register](https://github.com/hechuyi/grok-free-register) 二次开发。
+基于 [hechuyi/grok-free-register](https://github.com/hechuyi/grok-free-register) 二次修改。
 
 仅供学习研究，请遵守目标站点服务条款与当地法律，风险自负。
 
@@ -184,11 +184,6 @@ hub/
 - 概览的「注册趋势」图暂无数据源
 - `GROK_REGISTER_DIR` 默认值是开发机路径，部署必须覆盖
 
-## 致谢
-
-注册引擎来自 [hechuyi/grok-free-register](https://github.com/hechuyi/grok-free-register)（MIT），
-本项目通过子进程驱动它，不含其代码。前端布局脱胎于 u1s12api 的 dashboard，数据层为本项目重写。
-
 ## License
 
-GPL-3.0，见 [LICENSE](LICENSE)。上游项目各自遵循其原许可证。
+GPL-3.0，见 [LICENSE](LICENSE)。
