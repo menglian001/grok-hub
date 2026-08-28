@@ -1,0 +1,45 @@
+services:
+  grok-hub:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      # 想用别的注册机分支/fork：改这里，或在 .env 里设同名变量
+      args:
+        REGISTER_REPO: ${REGISTER_REPO:-https://github.com/hechuyi/grok-free-register.git}
+        REGISTER_REF: ${REGISTER_REF:-main}
+        # 构建期也要能出网（git clone 注册机、pip 装依赖、下 chromium）。
+        # 宿主代理同样要用 172.17.0.1，不能写 127.0.0.1。
+        BUILD_PROXY: ${REGISTER_PROXY:-}
+    image: grok-hub:local
+    container_name: grok-hub
+    restart: unless-stopped
+    ports:
+      # 只想本机访问就改成 "127.0.0.1:8790:8790"
+      - "${GROK_HUB_PORT:-8790}:8790"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      # 面板密码：首次启动写入哈希，之后可从 .env 删掉
+      GROK_HUB_PASSWORD: "${GROK_HUB_PASSWORD:?请在 .env 里设置 GROK_HUB_PASSWORD}"
+      GROK_HUB_HOST: "0.0.0.0"
+      GROK_HUB_PORT: "8790"
+      GROK_REGISTER_DIR: /app/register
+      GROK_HUB_DIR: /data/hub
+      # 有 HTTPS 反代时设 1
+      GROK_HUB_TLS: "${GROK_HUB_TLS:-0}"
+      # 注册机出网代理。宿主机上的代理要用 docker 网桥地址 172.17.0.1，
+      # 写 127.0.0.1 会指向容器自己。代理需监听 172.17.0.1 才通。
+      HTTP_PROXY: "${REGISTER_PROXY:-}"
+      HTTPS_PROXY: "${REGISTER_PROXY:-}"
+      NO_PROXY: "127.0.0.1,localhost,172.17.0.1"
+    volumes:
+      # 面板数据（设置、计数、告警、密码哈希）
+      - ./data:/data
+      # 注册产物；正常情况下账号入池后 hub 会自动删除，留着便于排查
+      - ./keys:/app/register/keys
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+    mem_limit: ${MEM_LIMIT:-2g}
+    shm_size: 1g

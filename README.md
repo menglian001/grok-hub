@@ -11,22 +11,50 @@
 
 ## 需要准备
 
-- **Node 22 以上**（零 npm 依赖，不用 `npm install`）
 - **[grok2api](https://github.com/chenyme/grok2api)** 已部署，管理面能登录
-- **[注册机](https://github.com/hechuyi/grok-free-register)** 能独立跑通
 - **代理**，能访问 x.ai / grok.com
+- **Docker**（推荐）；或者 **Node 22 以上** + 能独立跑通的
+  [注册机](https://github.com/hechuyi/grok-free-register)
 
 ## 装起来
 
+### 用 Docker（推荐，最省事）
+
+不用装 Node、不用装 Python、不用自己拉注册机，镜像里都有：
+
 ```bash
 git clone https://github.com/menglian001/grok-hub.git && cd grok-hub
+cp .env.example .env
+vim .env                      # 至少改 GROK_HUB_PASSWORD 和 REGISTER_PROXY
+docker compose up -d --build
+```
 
+打开 <http://127.0.0.1:8790/> 登录就行。注册机由构建时自动拉取，Python 环境和
+stealth chromium 都在镜像里（约 1.4GB，首次构建 5-10 分钟）。
+
+**代理地址要写 `172.17.0.1`**，不能写 `127.0.0.1`——那是容器自己。
+如果你的代理只监听 `127.0.0.1`，得让它也监听 `172.17.0.1`。
+
+拉不下基础镜像的话给 dockerd 也配个代理：
+
+```bash
+mkdir -p /etc/systemd/system/docker.service.d
+printf '[Service]\nEnvironment="HTTPS_PROXY=http://127.0.0.1:7890"\n' \
+  > /etc/systemd/system/docker.service.d/http-proxy.conf
+systemctl daemon-reload && systemctl restart docker
+```
+
+### 直接跑（已有 Node 22 和注册机）
+
+```bash
 GROK_HUB_PASSWORD='你的密码' \
 GROK_REGISTER_DIR=/opt/grok-free-register \
   node hub/server.mjs 8790
 ```
 
-打开 <http://127.0.0.1:8790/> 登录（密码只需首次设置，之后直接启动）。
+零 npm 依赖，不用 `npm install`。密码只需首次设置，之后直接启动。
+
+### 然后配置
 
 进 **系统设置 → 运行配置**，填三样：
 
@@ -94,32 +122,6 @@ sudo cp -r . /opt/grok-hub
 sudo cp deploy/grok-hub.service /etc/systemd/system/
 sudo vim /etc/systemd/system/grok-hub.service   # 改 GROK_REGISTER_DIR、首次填密码
 sudo systemctl enable --now grok-hub
-```
-
-### Docker（系统太旧装不了 Node 22 时用）
-
-Ubuntu 18.04 这类老系统装不上 Node 22，用 Docker 绕开：
-
-```bash
-# deploy/ 下放好 hub/（本项目 hub/）和 register/（注册机源码）
-cd deploy
-cat > .env <<'EOF'
-GROK_HUB_PASSWORD=你的密码
-REGISTER_PROXY=http://172.17.0.1:7890
-EOF
-docker compose build && docker compose up -d
-```
-
-**代理地址要用 `172.17.0.1`**，不能写 `127.0.0.1`——那是容器自己。
-如果代理只监听 `127.0.0.1`，得让它也监听 `172.17.0.1`。
-
-拉不下镜像的话给 dockerd 也配代理：
-
-```bash
-mkdir -p /etc/systemd/system/docker.service.d
-printf '[Service]\nEnvironment="HTTPS_PROXY=http://127.0.0.1:7890"\n' \
-  > /etc/systemd/system/docker.service.d/http-proxy.conf
-systemctl daemon-reload && systemctl restart docker
 ```
 
 ### 环境变量
